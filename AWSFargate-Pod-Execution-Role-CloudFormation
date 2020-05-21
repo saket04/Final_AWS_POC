@@ -1,0 +1,37 @@
+{
+   "AWSTemplateFormatVersion":"2010-09-09",
+   "Resources":{
+      "FargatePodExecutionRole":{
+         "Type":"AWS::IAM::Role",
+         "Properties":{
+            "AssumeRolePolicyDocument":{
+               "Version":"2012-10-17",
+               "Statement":[
+                  {
+                     "Effect":"Allow",
+                     "Principal":{
+                        "Service":[
+                           "eks-fargate-pods.amazonaws.com"
+                        ]
+                     },
+                     "Action":[
+                        "sts:AssumeRole"
+                     ]
+                  }
+               ]
+            },
+            "Description":"The role used to manage our PODS",
+            "ManagedPolicyArns":[
+               "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
+            ],
+            "RoleName":"aws-b2b-poc-POD-Execution-Role"
+         }
+      }
+   },
+   "Outputs":{
+      "PodExecutionRole":{
+         "Description":"Role for deploying the POD on Amazon EKS",
+         "Value":{ "Ref": "FargatePodExecutionRole" }
+      }
+   }
+}
