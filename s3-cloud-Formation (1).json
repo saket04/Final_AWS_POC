@@ -1,0 +1,27 @@
+{
+   "AWSTemplateFormatVersion":"2010-09-09",
+   "Description": "A template to create S3 Bucket",
+   "Resources":{
+      "S3Bucket":{
+         "Type":"AWS::S3::Bucket",
+         "DeletionPolicy":"Retain",
+         "Properties":{
+            "BucketName":"aws-b2b-poc-upload-download",
+			"PublicAccessBlockConfiguration":{
+			  "BlockPublicAcls": "true",
+			  "BlockPublicPolicy": "true",
+			  "IgnorePublicAcls": "true",
+			  "RestrictPublicBuckets": "true"
+			}
+         }
+      }
+   },
+   "Outputs":{
+      "AWSS3Bucket":{
+         "Description":"Create S3 Bucket",
+         "Value":{
+            "Ref": "S3Bucket"
+         }
+      }
+   }
+}
