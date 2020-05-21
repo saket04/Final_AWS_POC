@@ -1,0 +1,27 @@
+# creating an EKS Fargate-profile with EKS cluster,Private-subnet and podExecutionRole
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: aws-b2b-poc
+  region: us-east-1
+
+fargateProfiles:
+    - name: default
+      podExecutionRoleARN: "arn:aws:iam::050939474601:role/aws-b2b-poc-POD-Execution-Role"
+      selectors:
+        # All workloads in the "default" Kubernetes namespace will be
+        # scheduled onto Fargate:
+        - namespace: default
+        # All workloads in the "kube-system" Kubernetes namespace will be
+        # scheduled onto Fargate:
+        - namespace: kube-system
+    - name: aws-b2b-poc-services
+      podExecutionRoleARN: "arn:aws:iam::050939474601:role/aws-b2b-poc-POD-Execution-Role"
+      selectors:
+        # All workloads in the "dev" Kubernetes namespace matching the following
+        # label selectors will be scheduled onto Fargate:
+        - namespace: b2b-upload-download
+          labels:
+            env: dev
+            app: b2b-poc
