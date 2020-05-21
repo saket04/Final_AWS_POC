@@ -1,0 +1,27 @@
+# creating an EKS cluster using eksctl-command line tool with existing VPC,Subnet and EKS ServiceRole
+---
+    apiVersion: eksctl.io/v1alpha5
+    kind: ClusterConfig
+    
+    metadata:
+      name: aws-b2b-poc
+      region: us-east-1
+  
+    vpc:
+      id: "vpc-0dd81339e534e9434"  # (optional, must match VPC ID used for each subnet below)
+      subnets:
+          # must provide 'private' and/or 'public' subnets by availibility zone as shown
+        private:
+          us-east-1a:
+            id: "subnet-0e09a6d4e2e97aaf6"
+          us-east-1b:
+            id: "subnet-05892818bacd8131d"
+          
+        public:
+          us-east-1a:
+            id: "subnet-091eb4d65178e3829"
+          us-east-1b:
+            id: "subnet-0409893a2f1ba6e03"
+
+    iam:
+     serviceRoleARN: "arn:aws:iam::050939474601:role/aws-b2b-poc-EKSClusterRole"
