@@ -1,0 +1,5 @@
+# Creating a Namespace 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: b2b-upload-download
