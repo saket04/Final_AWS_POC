@@ -1,0 +1,305 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A template to create VPC with 2 Public and Private Subnet in two AZs . This template will also create InternetGateway,NatGateway,RouteTables with their appropriating Routes.A VPC Endpoint for S3 and ECR will also be created in this template.
+Parameters:
+  VPCName:
+    Description: A VPCName that will be prefixed to resource names
+    Type: String
+    Default: aws-b2b-poc
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.0.0.0/24
+
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.0.0/26
+
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.0.64/26
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.0.128/26
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.0.192/26
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Ref VPCName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, IG] ]
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, PublicSubnet-1] ]
+        - Key: kubernetes.io/role/elb
+          Value: 1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, PublicSubnet-2] ]
+        - Key: kubernetes.io/role/elb
+          Value: 1
+          
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, PrivateSubnet-1] ]
+        - Key: kubernetes.io/role/internal-elb
+          Value: 1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, PrivateSubnet-2] ]
+        - Key: kubernetes.io/role/internal-elb
+          Value: 1
+
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, EIP] ]
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, NatGateway] ]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, PublicRouteTable ] ]
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, PrivateRouteTable ] ]
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet2
+      
+  SecurityGroupForInterfaceVPCEndpoint:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref VPCName, SecurityGroupForInterfaceVPCEndpoint ] ]
+      GroupDescription: "Security group for Interface VPCEndpoint"
+      VpcId: !Ref VPC 
+      SecurityGroupIngress: 
+         - IpProtocol: tcp
+           FromPort: 0
+           ToPort: 65535
+           CidrIp: !Ref VpcCIDR
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref VPCName, InterfaceEndpointSecurityGroup] ]           
+ 
+  VPCEndpointForS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument: '{
+             "Version":"2012-10-17",
+             "Statement":[{
+               "Effect":"Allow",
+               "Principal":"*",
+               "Action":"*",
+               "Resource":"*"
+         }]
+        }'
+      RouteTableIds:
+            - !Ref PrivateRouteTable
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref VPC
+      
+  VPCEndpointForECRapi:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      PolicyDocument: '{
+             "Version":"2012-10-17",
+             "Statement":[{
+               "Effect":"Allow",
+               "Principal":"*",
+               "Action":"*",
+               "Resource":"*"
+         }]
+        }'
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.api
+      VpcId: !Ref VPC
+      SubnetIds: 
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+            - !Ref SecurityGroupForInterfaceVPCEndpoint
+      
+  VPCEndpointForECRdkr:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      PolicyDocument: '{
+             "Version":"2012-10-17",
+             "Statement":[{
+               "Effect":"Allow",
+               "Principal":"*",
+               "Action":"*",
+               "Resource":"*"
+         }]
+        }'
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.dkr
+      VpcId: !Ref VPC
+      SubnetIds: 
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+            - !Ref SecurityGroupForInterfaceVPCEndpoint
+
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+
+  PublicSubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+
+  PrivateSubnets:
+    Description: A list of the private subnets
+    Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+
+  PublicSubnet1:
+    Description: Public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+
+  PublicSubnet2:
+    Description: Public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+
+  PrivateSubnet1:
+    Description: Private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+
+  PrivateSubnet2:
+    Description: Private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+    
+  SecurityGroup:
+    Description: SecurityGroup for VPC Interface Endpoint
+    Value: !Ref SecurityGroupForInterfaceVPCEndpoint
+ 
+  S3VPCEndpoint:
+    Description: VPC Endpoint for accessing s3 privately
+    Value: !Ref VPCEndpointForS3 
+    
+  ECRAPIEndpoint:
+    Description: VPC Endpoint for accessing ECR privately
+    Value: !Ref VPCEndpointForECRapi
+    
+  ECRDKREndpoint:
+    Description: VPC Endpoint for accessing ECR privately
+    Value: !Ref VPCEndpointForECRdkr
